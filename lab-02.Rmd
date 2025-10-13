@@ -35,56 +35,13 @@ The due day for each lab can be found on the [course wesbite](https://www.yuehao
 
 ------------------------------------------------------------------------
 
-Dear prof, the original chunk is not working. So i use ChatGPT to help me with the download of dataset. Hope you don't mind.
-
-```{r setup, message=FALSE, warning=FALSE}
-# 基本套件
-if (!requireNamespace("tidyverse", quietly = TRUE)) install.packages("tidyverse")
-library(tidyverse)
-
-# 嘗試安裝 kingCoData（GitHub）
-load_kingcodata <- function() {
-  if (!requireNamespace("kingCoData", quietly = TRUE)) {
-    if (!requireNamespace("devtools", quietly = TRUE)) install.packages("devtools")
-    ok <- FALSE
-    try({devtools::install_github("andykrause/kingCoData"); ok <- TRUE}, silent = TRUE)
-    if (!ok) {
-      if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
-      try({remotes::install_github("andykrause/kingCoData"); ok <- TRUE}, silent = TRUE)
-    }
-    if (!ok) return(FALSE)
-  }
-  library(kingCoData)
-  return(TRUE)
-}
-
-got_pkg <- load_kingcodata()
-
-# 載入資料：優先用 package，失敗就用 CSV 備案
-if (isTRUE(got_pkg)) {
-  # 從資料包載入
-  data("kingco_sales", package = "kingCoData", envir = environment())
-} 
-
-if (!exists("kingco_sales")) {
-  # 備案：直接讀 GitHub 的原始 CSV（與套件內同源）
-  # 若校園網路擋 GitHub，這步可能也需要 VPN。
-  sales_url <- "https://raw.githubusercontent.com/andykrause/kingCoData/main/data/kingco_sales.csv"
-  kingco_sales <- readr::read_csv(sales_url, show_col_types = FALSE)
-}
-
-# 檢查載入結果
-stopifnot(exists("kingco_sales"))
-```
-
 ## Lab 02-A: Modifying Dataframes
 
 Let's first import the datasets and necessary packages. **If you are using a Windows computer**, you need to install [RTools](https://cran.r-project.org/bin/windows/Rtools/) first. After installing this data package with `devtools::install_github('andykrause/kingCoData')`, you can load the data with: `data(kingco_sales)` and `data(kingco_homes)`. You can find the datasets and Readme file in [this repository](https://github.com/andykrause/kingCoData).
 
 ```{r message=FALSE}
-install.packages("devtools")
 library('tidyverse')
-devtools::install_github('andykrause/kingCoData') # You only need to run the installation once
+#devtools::install_github('andykrause/kingCoData') # You only need to run the installation once
 library('kingCoData') # load the data package
 data(kingco_sales) # load the sale data
 ```
@@ -290,7 +247,34 @@ Using the dataset `kingco_homes` and the operations we learned, especially pipe 
 6.  Report the difference in average and variance
 
 ```{r}
-# TODO
+
+library(dplyr)
+library(kingCoData)
+data("kingco_homes")
+
+#1,2
+homes_bellevue <- kingco_homes %>%
+  select(pinx, city, land_val, imp_val, sqft, view_lakewash, view_lakesamm) %>%
+  filter(city == "BELLEVUE")
+
+#3
+homes_bellevue$total_val <- homes_bellevue$land_val + homes_bellevue$imp_val
+
+#4
+mean_all <- mean(homes_bellevue$total_val, na.rm = TRUE)
+var_all <- var(homes_bellevue$total_val, na.rm = TRUE)
+
+#5
+homes_two_lakes <- homes_bellevue %>% filter(view_lakewash == 1, view_lakesamm == 1)
+mean_two <- mean(homes_two_lakes$total_val, na.rm = TRUE)
+var_two <- var(homes_two_lakes$total_val, na.rm = TRUE)
+
+#6
+data.frame(
+  group = c("All BELLEVUE", "Both Lakes in BELLEVUE", "Diff (both - all)"),
+  mean_total_val = c(mean_all, mean_two, mean_two - mean_all),
+  var_total_val = c(var_all, var_two, var_two - var_all)
+)
 ```
 
 ------------------------------------------------------------------------
@@ -355,7 +339,7 @@ kingco_sales %>%
 We mentioned two variables are keys: `sale_id` and `pinx`. `pinx`, property ID, exists in both datasets, which serves as the **primary key** for `kingco_homes` — each row has a distinct `pinx`. Meanwhile, it is a **foreign key** in `kingco_sales`: in `kingco_sales`, same property can associate with more than one transactions.
 
 | Variable | kingco_sales | kingco_homes |
-|----|----|----|
+|--------------------|--------------------------|--------------------------|
 | sale_id | ✔️ (unique transaction ID, primary key) | ❌ (not included) |
 | pinx | ✔️ (property ID, foreign key) | ✔️ (property ID, primary key) |
 
@@ -469,7 +453,24 @@ Let's use the `kingco_homes_clean` data to do some summarise and analysis.
 For all property in Seattle, what's the average total values per sqft [(`land_val` + `imp_val`)/`sqft`] by condition? Also, add the count of properties in each group in the summary table.
 
 ```{r}
-# TODO
+
+seattle_homes <- kingco_homes_clean %>%
+  mutate(city_clean = toupper(trimws(city))) %>%
+  filter(city_clean == "SEATTLE", !is.na(sqft), sqft > 0) %>%
+  select(-city_clean)
+
+seattle_homes <- seattle_homes %>%
+  mutate(val_per_sqft = (land_val + imp_val) / sqft)
+         
+seattle_by_condition <- seattle_homes %>%
+  group_by(condition) %>%
+  summarise(
+    n = n(),
+    avg_val_per_sqft = mean(val_per_sqft, na.rm = TRUE)
+  ) %>%
+  arrange(desc(avg_val_per_sqft))
+
+seattle_by_condition
 
 ```
 
@@ -558,7 +559,30 @@ So far, we've learned a lots functions, please use as many as possible to explor
 -   `distinct()` and `slice_max()` – handle duplicates
 
 ```{r}
-# TODO
+set.seed(79)
+sample_means_10 <- replicate(
+  200,
+  bellevue_after2020 %>%
+    sample_n(10,replace = TRUE) %>%
+    summarise(avg_price = mean(sale_price, na.rm = TRUE)) %>%
+    pull(avg_price)
+)
+
+hist(
+  sample_means_10,
+  breaks = 30,
+  main = "Sampling Distribution of Mean Sale Price (n = 10, reps = 200)",
+  xlab = "Sample Mean Sale Price (USD)"
+)
+abline(v = sale_price_mean, col = "red", lwd = 2)
+
+emp_mean_10 <- mean(sample_means_10)
+emp_sd_10   <- sd(sample_means_10)
+
+pop_sd <- sd(bellevue_after2020$sale_price, na.rm = TRUE)
+se_theory_10 <- pop_sd / sqrt(10)
+
+emp_mean_10; emp_sd_10; se_theory_10
 ```
 
 ### 📚 TODO: Using GitHub
