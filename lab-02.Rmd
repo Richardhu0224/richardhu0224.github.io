@@ -261,10 +261,15 @@ homes_bellevue <- kingco_homes %>%
 homes_bellevue$total_val <- homes_bellevue$land_val + homes_bellevue$imp_val
 
 #4
+top10_total_val <- homes_bellevue %>%
+  arrange(desc(total_val)) %>%
+  head(10)
+top10_total_val
+
+#5
 mean_all <- mean(homes_bellevue$total_val, na.rm = TRUE)
 var_all <- var(homes_bellevue$total_val, na.rm = TRUE)
 
-#5
 homes_two_lakes <- homes_bellevue %>% filter(view_lakewash == 1, view_lakesamm == 1)
 mean_two <- mean(homes_two_lakes$total_val, na.rm = TRUE)
 var_two <- var(homes_two_lakes$total_val, na.rm = TRUE)
@@ -535,8 +540,39 @@ abline(v = sale_price_mean, col = "red", lwd = 2)
 Repeat the process with smaller sample size, such as `n = 10`, and smaller repeating time, such as 200. What did you find? What interpretation can you give for the central limit theorem from your simulation results?
 
 ```{r}
-# TODO
+
+set.seed(999)
+n <- 10
+reps <- 200
+sample_mean_10 <- numeric(reps)
+
+for(i in 1:reps) {
+  s <- bellevue_after2020 %>%
+    sample_n(n, replace = TRUE)
+  sample_mean_10[i] <- mean(s$sale_price, na.rm = TRUE)
+}
+
+length(sample_mean_10)
+head(sample_mean_10, 6)
+
+hist(
+  sample_mean_10,
+  breaks = 30,
+  main = "Sampling Distribution (n = 10, reps = 200)",
+  xlab = "Sample Mean Sale Price (USD)"
+)
 ```
+
+Findings
+1. The histogram of sample means looks bell-shaped.
+2. The center is close to Bellevue overall average.
+3. When "n" is small, the histogram is wider and jagged.
+
+Interpretation
+1. Even if individual prices are skewed, the mean of a random sample is about normal.
+2. The sample mean stays around the population mean.
+3. When "n" Smaller, the spread is larger.
+4. Larger "n" means a tighter, smoother histogram.
 
 ### 📚 TODO: Explore More
 
@@ -559,13 +595,21 @@ So far, we've learned a lots functions, please use as many as possible to explor
 -   `distinct()` and `slice_max()` – handle duplicates
 
 ```{r}
-set.seed(79)
-sample_means_10 <- replicate(
-  200,
-  bellevue_after2020 %>%
-    sample_n(10,replace = TRUE) %>%
-    summarise(avg_price = mean(sale_price, na.rm = TRUE)) %>%
-    pull(avg_price)
+set.seed(99)
+n <- 10
+reps <- 200
+sample_means_10 <- numeric(reps)
+
+for (i in 1:reps) {
+  s <- bellevue_after2020 %>% sample_n(n, replace = TRUE)
+  sample_means_10[i] <- mean(s$sale_price, na.rm = TRUE)
+}
+
+hist(
+  sample_means_10,
+  breaks = 30,
+  main = "Sampling Distribution of Mean Sale Price (n = 10, reps = 200)",
+  xlab = "Sample Mean Sale Price (USD)"
 )
 
 hist(
@@ -580,10 +624,32 @@ emp_mean_10 <- mean(sample_means_10)
 emp_sd_10   <- sd(sample_means_10)
 
 pop_sd <- sd(bellevue_after2020$sale_price, na.rm = TRUE)
-se_theory_10 <- pop_sd / sqrt(10)
+se_theory_10 <- pop_sd / sqrt(n)
 
-emp_mean_10; emp_sd_10; se_theory_10
+emp_mean_10
+emp_sd_10
+se_theory_10
+
+bellevue_highend <- bellevue_after2020 %>%
+  filter(!is.na(grade), grade >= 9, !is.na(sale_price)) %>%
+  select(city, sale_date, sale_price, sqft, grade) %>%
+  arrange(desc(sale_price)) 
+
+head(bellevue_highend, 10)
+
+bellevue_highend_psf <- bellevue_highend %>%
+  mutate(price_psf = sale_price / sqft) %>%
+  arrange(desc(price_psf))
+head(bellevue_highend_psf, 10)
 ```
+
+Functions used: sample_n() + set.seed(), filter(), select(), arrange(desc()), mutate() 
+
+Results: 
+1. The histogram of sample means looks roughly bell-shaped. 
+2. Because the sample size is small (n = 10), the histogram is wider and a bit jagged. 
+3. The most expensive transactions are far above the rest. 
+4. Higher-grade homes tend to have higher price per sqft.
 
 ### 📚 TODO: Using GitHub
 
